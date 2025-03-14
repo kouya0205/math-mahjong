@@ -82,7 +82,7 @@ export default function WaitingRoom() {
           )}
         </div>
         
-        {isHost && roomData?.players.length < 2 && (
+        {isHost && roomData?.players?.length < 2 && (
           <p className="text-red-500 text-sm mt-2 text-center">ゲームを開始するには少なくとも2人のプレイヤーが必要です</p>
         )}
       </div>

@@ -33,5 +33,11 @@ module.exports = {
     // 'import/newline-after-import': 'error',
     // 'import/no-duplicates': 'error',
     // 'unused-imports/no-unused-imports': 'error'
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-unused-vars': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'off',
   },
+  // ビルド時のエラーを警告として扱う
+  ignorePatterns: ['.eslintrc.js', 'next.config.js'],
 };

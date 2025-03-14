@@ -75,14 +75,14 @@ export default function WaitingRoom() {
             <button
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               onClick={handleStartGame}
-              disabled={!roomData || roomData.players.length < 2}
+              disabled={!roomData || (roomData?.players ?? []).length < 2}
             >
               ゲーム開始
             </button>
           )}
         </div>
         
-        {isHost && roomData?.players?.length < 2 && (
+        {isHost && (roomData?.players ?? []).length < 2 && (
           <p className="text-red-500 text-sm mt-2 text-center">ゲームを開始するには少なくとも2人のプレイヤーが必要です</p>
         )}
       </div>

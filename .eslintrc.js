@@ -7,13 +7,13 @@ module.exports = {
   parser: "@typescript-eslint/parser",
   // plugins: ['@typescript-eslint'],
   // , 'simple-import-sort', 'unused-imports'
-  extends: [
+  // extends: [
     // 'eslint:recommended',
     // 'plugin:react/recommended',
-    "plugin:prettier/recommended",
+    // "plugin:prettier/recommended",
     //     'next',
     //     'next/core-web-vitals'
-  ],
+  // ],
   parserOptions: {
     ecmaFeatures: {
       jsx: true,

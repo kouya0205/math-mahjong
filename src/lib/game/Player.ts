@@ -12,12 +12,14 @@ export class Player {
   name: string;
   hand: Card[];
   score: number;
+  socketId?: string;
 
-  constructor(id: string, name: string) {
+  constructor(id: string, name: string, socketId?: string) {
     this.id = id;
     this.name = name;
     this.hand = [];
     this.score = 0;
+    this.socketId = socketId;
   }
 
   addCards(cards: Card[]) {

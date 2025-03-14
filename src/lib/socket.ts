@@ -39,9 +39,37 @@ export const initSocket = (): Socket => {
 };
 
 export const getSocket = (): Socket => {
-  if (!socket || !socket.connected) {
-    return initSocket();
+  if (!socket) {
+    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+      transports: ['websocket'],
+      autoConnect: true
+    });
+    
+    // デバッグ用のイベントリスナー
+    socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+    
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
+    
+    // gameStateイベントのデバッグ
+    socket.on('gameState', (data) => {
+      console.log('Received game state:', data);
+      console.log('Players with hand:', data.players.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        hasHand: !!p.hand,
+        handLength: p.hand ? p.hand.length : 0
+      })));
+    });
   }
+  
   return socket;
 };
 

@@ -8,6 +8,7 @@ import PlayerInfo from './PlayerInfo';
 import GameInfo from './GameInfo';
 import DiscardPile from './DiscardPile';
 import GameResult from './GameResult';
+import OpponentView from './OpponentView';
 
 interface GameBoardProps {
   gameState: {
@@ -29,6 +30,12 @@ interface GameBoardProps {
       score: number;
       handCount: number;
       isCurrentPlayer: boolean;
+      hand?: Array<{
+        id: string;
+        value: number | string;
+        type: 'number' | 'operator';
+        display: string;
+      }>;
     }>;
     targetNumber: number;
     deckCount: number;
@@ -62,6 +69,8 @@ export default function GameBoard({ gameState, roomId }: GameBoardProps) {
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const router = useRouter();
+
+  console.log(gameState);
   
   // ゲーム終了イベントのリスナー
   useEffect(() => {
@@ -157,8 +166,23 @@ export default function GameBoard({ gameState, roomId }: GameBoardProps) {
   // 現在のプレイヤーのターンかどうかを判定
   const isCurrentPlayerTurn = currentPlayer?.id === players.find((p: any) => p.isCurrentPlayer)?.id;
   
+  // 自分のプレイヤーIDを取得
+  const myPlayerId = gameState.players.find(p => 
+    p.hand && p.hand.some(card => 
+      gameState.playerHand.some(myCard => myCard.id === card.id)
+    )
+  )?.id || '';
+  
+  // 自分以外のプレイヤーを取得
+  const opponents = gameState.players.filter(player => 
+    player.id !== myPlayerId
+  );
+  
   // デバッグ用にゲーム状態をコンソールに出力
   console.log('Game state:', gameState);
+  console.log('Players:', gameState.players);
+  console.log('My player ID:', myPlayerId);
+  console.log('Opponents:', opponents);
   
   // ゲーム終了時の表示
   if (winner || gameState.status === 'finished') {
@@ -184,19 +208,20 @@ export default function GameBoard({ gameState, roomId }: GameBoardProps) {
       <div className="max-w-6xl mx-auto">
         {/* ゲーム情報 */}
         <GameInfo 
-          currentPlayerName={currentPlayer?.name || '不明なプレイヤー'}
+          currentPlayerName={gameState.currentPlayer?.name || '不明'}
           deckCount={gameState.deckCount || 0}
           targetNumber={gameState.targetNumber || 0}
           lastAction={gameState.lastAction}
         />
         
-        {/* プレイヤー情報 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {players.map((player: any) => (
-            <PlayerInfo 
-              key={player.id}
-              player={player}
-              isCurrentPlayer={player.isCurrentPlayer}
+        {/* 相手プレイヤー */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {opponents.map((opponent, index) => (
+            <OpponentView 
+              key={opponent.id} 
+              player={opponent} 
+              position={index} 
+              myPlayerId={myPlayerId}
             />
           ))}
         </div>

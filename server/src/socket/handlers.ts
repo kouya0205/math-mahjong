@@ -254,7 +254,9 @@ export const setupSocketHandlers = (io: Server): void => {
         for (const player of room.players) {
           const playerUser = await User.findById(player.userId);
           if (playerUser) {
-            const gamePlayer = new Player(playerUser._id.toString(), player.name);
+            // socketIdを取得
+            const socketId = playerUser.socketId;
+            const gamePlayer = new Player(playerUser._id.toString(), player.name, socketId);
             gameInstance.addPlayer(gamePlayer);
           }
         }
@@ -272,27 +274,35 @@ export const setupSocketHandlers = (io: Server): void => {
         // ゲームインスタンスを保存
         gameInstances.set(roomId, gameInstance);
         
-        // ルームのステータスを更新
-        room.status = 'playing';
-        await room.save();
-        
-        // ゲームデータをDBに保存
+        // ゲーム状態をDBに保存
         const game = new Game({
           roomId,
+          status: 'playing',
           players: room.players.map(p => ({
             userId: p.userId,
             name: p.name,
             score: 0,
-            handCount: 6 // 初期手札数
+            handCount: 7 // 初期手札数
           })),
           currentPlayerIndex: 0,
-          status: 'playing',
-          targetNumber: gameInstance.targetNumber
+          targetNumber: gameInstance.targetNumber,
+          deckCount: gameInstance.deck.remainingCards(),
+          createdAt: new Date()
         });
+        
         await game.save();
         
-        // ルームにゲームIDを関連付け
-        room.gameId = game._id;
+        // 各プレイヤーにゲーム状態を送信
+        for (const player of gameInstance.players) {
+          const playerSocket = await findSocketByUserId(io, player.id);
+          if (playerSocket) {
+            const gameState = gameInstance.getGameStateForPlayer(player.id);
+            playerSocket.emit('gameState', gameState);
+          }
+        }
+        
+        // ルームのステータスを更新
+        room.status = 'playing';
         await room.save();
         
         // 全プレイヤーにゲーム開始を通知
@@ -338,10 +348,14 @@ export const setupSocketHandlers = (io: Server): void => {
           userId: user._id.toString(),
           playerName: user.name,
           hasPlayers: !!gameState.players,
-          playerCount: gameState.players ? gameState.players.length : 0
+          playerCount: gameState.players ? gameState.players.length : 0,
+          playersHaveHand: gameState.players ? gameState.players.some((p: any) => p.hand) : false,
+          firstPlayerHand: gameState.players && gameState.players.length > 0 ? !!gameState.players[0].hand : false
         });
         
-        socket.emit('gameState', gameState);
+        // 手札情報が失われないように、JSON文字列に変換してから送信
+        const gameStateJson = JSON.stringify(gameState);
+        socket.emit('gameState', JSON.parse(gameStateJson));
       } catch (error) {
         console.error('ゲーム状態取得エラー:', error);
         socket.emit('gameError', 'ゲーム状態の取得に失敗しました');
@@ -400,13 +414,7 @@ export const setupSocketHandlers = (io: Server): void => {
         await updateGameState(roomId, gameInstance);
         
         // 全プレイヤーにゲーム状態を送信
-        for (const player of gameInstance.players) {
-          const playerSocket = await findSocketByUserId(io, player.id);
-          if (playerSocket) {
-            const playerGameState = gameInstance.getGameStateForPlayer(player.id);
-            playerSocket.emit('gameState', playerGameState);
-          }
-        }
+        sendGameStateToPlayers(io, roomId, gameInstance);
         
         if (typeof callback === 'function') {
           callback({ success: true, card: drawnCard });
@@ -474,13 +482,7 @@ export const setupSocketHandlers = (io: Server): void => {
         await updateGameState(roomId, gameInstance);
         
         // 全プレイヤーにゲーム状態を送信
-        for (const player of gameInstance.players) {
-          const playerSocket = await findSocketByUserId(io, player.id);
-          if (playerSocket) {
-            const playerGameState = gameInstance.getGameStateForPlayer(player.id);
-            playerSocket.emit('gameState', playerGameState);
-          }
-        }
+        sendGameStateToPlayers(io, roomId, gameInstance);
         
         if (typeof callback === 'function') {
           callback({ success: true });
@@ -493,7 +495,7 @@ export const setupSocketHandlers = (io: Server): void => {
       }
     });
 
-    // カードを出す（式を作成）
+    // カードを出す
     socket.on('playCards', async ({ roomId, cardIds }, callback) => {
       try {
         // ユーザー検索
@@ -554,6 +556,9 @@ export const setupSocketHandlers = (io: Server): void => {
           });
         }
         
+        // 全プレイヤーにゲーム状態を送信
+        sendGameStateToPlayers(io, roomId, gameInstance);
+        
         if (typeof callback === 'function') {
           callback(result);
         }
@@ -612,8 +617,8 @@ async function findSocketByUserId(io: Server, userId: string): Promise<any> {
     const user = await User.findById(userId);
     if (!user || !user.socketId) return null;
     
-    const sockets = await io.fetchSockets();
-    return sockets.find(s => s.id === user.socketId) || null;
+    // ソケットIDからソケットを取得
+    return io.sockets.sockets.get(user.socketId) || null;
   } catch (error) {
     console.error('ソケット検索エラー:', error);
     return null;
@@ -660,5 +665,36 @@ async function updateGameState(roomId: string, gameInstance: GameLogic) {
     await game.save();
   } catch (error) {
     console.error('ゲーム状態保存エラー:', error);
+  }
+}
+
+// ゲーム状態をクライアントに送信する関数
+function sendGameStateToPlayers(io: Server, roomId: string, gameInstance: GameLogic) {
+  for (const player of gameInstance.players) {
+    // socketIdがundefinedの場合はスキップ
+    if (!player.socketId) continue;
+    
+    const playerSocket = io.sockets.sockets.get(player.socketId);
+    if (playerSocket) {
+      const gameState = gameInstance.getGameStateForPlayer(player.id);
+      
+      // デバッグ用にゲーム状態をログに出力
+      console.log(`プレイヤー ${player.name} にゲーム状態を送信:`, {
+        hasHand: !!gameState.playerHand,
+        playersHaveHand: gameState.players ? gameState.players.some((p: any) => p.hand) : false,
+        players: gameState.players.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          handCount: p.handCount,
+          hasHand: !!p.hand,
+          handLength: p.hand ? p.hand.length : 0,
+          firstCard: p.hand && p.hand.length > 0 ? JSON.stringify(p.hand[0]) : null
+        }))
+      });
+      
+      // 手札情報が失われないように、JSON文字列に変換してから送信
+      const gameStateJson = JSON.stringify(gameState);
+      playerSocket.emit('gameState', JSON.parse(gameStateJson));
+    }
   }
 } 

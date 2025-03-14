@@ -272,18 +272,34 @@ export class Game {
     const player = this.players.find(p => p.id === playerId);
     if (!player) return null;
     
-    // 他のプレイヤー情報を取得
-    const players = this.players.map(p => ({
-      id: p.id,
-      name: p.name,
-      score: p.score,
-      handCount: p.hand.length,
-      isCurrentPlayer: p.id === this.getCurrentPlayer()?.id
-    }));
+    // 他のプレイヤー情報を取得（手札情報を含む）
+    const players = this.players.map(p => {
+      // 手札情報をJSON形式に変換して含める
+      const handCards = p.hand.map(card => ({
+        id: card.id,
+        value: card.value,
+        type: card.type,
+        display: card.display
+      }));
+      
+      return {
+        id: p.id,
+        name: p.name,
+        score: p.score,
+        handCount: p.hand.length,
+        isCurrentPlayer: p.id === this.getCurrentPlayer()?.id,
+        hand: handCards // 手札情報を明示的に含める
+      };
+    });
     
     return {
       roomId: this.roomId,
-      playerHand: player.hand,
+      playerHand: player.hand.map(card => ({
+        id: card.id,
+        value: card.value,
+        type: card.type,
+        display: card.display
+      })),
       playerScore: player.score,
       currentPlayer: this.getCurrentPlayer() ? {
         id: this.getCurrentPlayer()!.id,
@@ -292,7 +308,12 @@ export class Game {
       players: players,
       targetNumber: this.targetNumber,
       deckCount: this.deck.remainingCards(),
-      discardPile: this.discardPile.slice(-5), // 最新の5枚のみ
+      discardPile: this.discardPile.slice(-5).map(card => ({
+        id: card.id,
+        value: card.value,
+        type: card.type,
+        display: card.display
+      })),
       status: this.status,
       lastAction: this.lastAction ? {
         playerId: this.lastAction.playerId,

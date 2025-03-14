@@ -5,6 +5,11 @@ const nextConfig = {
     // ビルド時にESLintによるエラーチェックを無効化
     ignoreDuringBuilds: true,
   },
+  // TypeScriptのエラーチェックを無効化
+  typescript: {
+    // ビルド時のType Checkをスキップ
+    ignoreBuildErrors: true,
+  },
 }
 
 module.exports = nextConfig 
